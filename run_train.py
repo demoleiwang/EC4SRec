@@ -30,6 +30,7 @@ if __name__ == '__main__':
 
     args, _ = parser.parse_known_args()
 
+
     config_dict = {
         'neg_sampling': None,
         'method': args.method,
