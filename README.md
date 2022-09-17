@@ -38,8 +38,8 @@ python run_train.py --dataset=ml-100k --model=SASRec --method=CL4SRec --gpu_id=0
 #### Experimtents on ML-100K
 | model            | Recall@5 | Recall@10 | Recall@20 | NDCG@5 | NDCG@10 | NDCG@20 |
 |------------------|----------|-----------|-----------|--------|---------|---------|
-| SASRec           |0.0700    |0.1304     |0.2269     |0.0423  |0.0617   | 0.086   |
-| CL4SRec          |          |           |           |        |         |         |
+| SASRec           |0.0700    |0.1304     |0.2269     |0.0423  |0.0617   |0.0860   |
+| CL4SRec          |0.0753    |0.1273     |0.2216     |0.0452  |0.0617   |0.0856   |
 |  w/ X-Aug        |          |           |           |        |         |         |
 | CoSeRec          |          |           |           |        |         |         |
 |  w/ X-Aug        |          |           |           |        |         |         |
