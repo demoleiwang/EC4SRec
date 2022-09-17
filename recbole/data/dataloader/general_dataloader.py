@@ -73,7 +73,7 @@ class TrainDataLoader(NegSampleDataLoader):
 
     ### CL4SRec
     def cl4srec_aug(self, cur_data):
-        def item_crop(seq, length, eta=0.6):
+        def item_crop(seq, length, eta=0.9):
             num_left = math.floor(length * eta)
             crop_begin = random.randint(0, length - num_left)
             croped_item_seq = np.zeros(seq.shape[0])
@@ -83,14 +83,14 @@ class TrainDataLoader(NegSampleDataLoader):
                 croped_item_seq[:num_left] = seq[crop_begin:]
             return torch.tensor(croped_item_seq, dtype=torch.long), torch.tensor(num_left, dtype=torch.long)
 
-        def item_mask(seq, length, gamma=0.3):
+        def item_mask(seq, length, gamma=0.1):
             num_mask = math.floor(length * gamma)
             mask_index = random.sample(range(length), k=num_mask)
             masked_item_seq = seq[:]
             masked_item_seq[mask_index] = 0  # self.dataset.item_num  # token 0 has been used for semantic masking
             return masked_item_seq, length
 
-        def item_reorder(seq, length, beta=0.6):
+        def item_reorder(seq, length, beta=0.1):
             num_reorder = math.floor(length * beta)
             reorder_begin = random.randint(0, length - num_reorder)
             reordered_item_seq = seq[:]
