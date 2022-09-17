@@ -5,12 +5,12 @@ Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequent
 
 ## EC4SRec News
 
-**09/17/2022**: We updated SASRec.
+**09/17/2022**: We updated SASRec and CL4SRec.
 
 ## EC4SRec To-Do list
 
 - [x] Update SASRec.
-- [ ] Update CL4SRec.
+- [x] Update CL4SRec.
 - [ ] Update CL4SRec w/ X-Aug (Ours).
 - [ ] Update CoSeRec.
 - [ ] Update CoSeRec w/ X-Aug (Ours).
@@ -21,12 +21,24 @@ Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequent
 - [ ] Update ICL.
 - [ ] Update EC4SRec (Ours).
 
+## Quick Start
+
+Command for SASRec on ml-100k
+~~~
+python run_train.py --dataset=ml-100k --model=SASRec --method=None --gpu_id=1 
+~~~
+
+Command for CL4SRec over SASRec on ml-100k
+~~~
+python run_train.py --dataset=ml-100k --model=SASRec --method=CL4SRec --gpu_id=0 
+~~~
+
 ## Performance
 
 #### Experimtents on ML-100K
 | model            | Recall@5 | Recall@10 | Recall@20 | NDCG@5 | NDCG@10 | NDCG@20 |
 |------------------|----------|-----------|-----------|--------|---------|---------|
-| SASRec           |          |           |           |        |         |         |
+| SASRec           |0.0700    |0.1304     |0.2269     |0.0423  |0.0617   | 0.086   |
 | CL4SRec          |          |           |           |        |         |         |
 |  w/ X-Aug        |          |           |           |        |         |         |
 | CoSeRec          |          |           |           |        |         |         |

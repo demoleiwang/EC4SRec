@@ -19,6 +19,9 @@ from recbole.data.dataloader.abstract_dataloader import AbstractDataLoader, NegS
 from recbole.data.interaction import Interaction, cat_interactions
 from recbole.utils import InputType, ModelType
 
+import math
+import random
+
 
 class TrainDataLoader(NegSampleDataLoader):
     """:class:`TrainDataLoader` is a dataloader for training.
@@ -61,8 +64,77 @@ class TrainDataLoader(NegSampleDataLoader):
 
     def _next_batch_data(self):
         cur_data = self._neg_sampling(self.dataset[self.pr:self.pr + self.step])
+
+        if self.config['method'] == 'CL4SRec':
+            self.cl4srec_aug(cur_data)
+
         self.pr += self.step
         return cur_data
+
+    ### CL4SRec
+    def cl4srec_aug(self, cur_data):
+        def item_crop(seq, length, eta=0.6):
+            num_left = math.floor(length * eta)
+            crop_begin = random.randint(0, length - num_left)
+            croped_item_seq = np.zeros(seq.shape[0])
+            if crop_begin + num_left < seq.shape[0]:
+                croped_item_seq[:num_left] = seq[crop_begin:crop_begin + num_left]
+            else:
+                croped_item_seq[:num_left] = seq[crop_begin:]
+            return torch.tensor(croped_item_seq, dtype=torch.long), torch.tensor(num_left, dtype=torch.long)
+
+        def item_mask(seq, length, gamma=0.3):
+            num_mask = math.floor(length * gamma)
+            mask_index = random.sample(range(length), k=num_mask)
+            masked_item_seq = seq[:]
+            masked_item_seq[mask_index] = 0  # self.dataset.item_num  # token 0 has been used for semantic masking
+            return masked_item_seq, length
+
+        def item_reorder(seq, length, beta=0.6):
+            num_reorder = math.floor(length * beta)
+            reorder_begin = random.randint(0, length - num_reorder)
+            reordered_item_seq = seq[:]
+            shuffle_index = list(range(reorder_begin, reorder_begin + num_reorder))
+            random.shuffle(shuffle_index)
+            reordered_item_seq[reorder_begin:reorder_begin + num_reorder] = reordered_item_seq[shuffle_index]
+            return reordered_item_seq, length
+
+        seqs = cur_data['item_id_list'].clone()
+        lengths = cur_data['item_length'].clone()
+
+        aug_seq1 = []
+        aug_len1 = []
+        aug_seq2 = []
+        aug_len2 = []
+        for seq, length in zip(seqs, lengths):
+            if length > 1:
+                switch = random.sample(range(3), k=2)
+            else:
+                switch = [3, 3]
+                aug_seq = seq
+                aug_len = length
+            if switch[0] == 0:
+                aug_seq, aug_len = item_crop(seq.clone(), length.clone())
+            elif switch[0] == 1:
+                aug_seq, aug_len = item_mask(seq.clone(), length.clone())
+            elif switch[0] == 2:
+                aug_seq, aug_len = item_reorder(seq.clone(), length.clone())
+
+            aug_seq1.append(aug_seq)
+            aug_len1.append(aug_len)
+
+            if switch[1] == 0:
+                aug_seq, aug_len = item_crop(seq.clone(), length.clone())
+            elif switch[1] == 1:
+                aug_seq, aug_len = item_mask(seq.clone(), length.clone())
+            elif switch[1] == 2:
+                aug_seq, aug_len = item_reorder(seq.clone(), length.clone())
+
+            aug_seq2.append(aug_seq)
+            aug_len2.append(aug_len)
+
+        cur_data.update(Interaction({'aug1': torch.stack(aug_seq1), 'aug_len1': torch.stack(aug_len1),
+                                     'aug2': torch.stack(aug_seq2), 'aug_len2': torch.stack(aug_len2)}))
 
 
 class NegSampleEvalDataLoader(NegSampleDataLoader):

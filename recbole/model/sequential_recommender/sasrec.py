@@ -36,6 +36,8 @@ class SASRec(SequentialRecommender):
     def __init__(self, config, dataset):
         super(SASRec, self).__init__(config, dataset)
 
+        self.config = config
+        self.nce_fct = nn.CrossEntropyLoss()
         # load parameters info
         self.n_layers = config['n_layers']
         self.n_heads = config['n_heads']
@@ -117,11 +119,25 @@ class SASRec(SequentialRecommender):
             pos_score = torch.sum(seq_output * pos_items_emb, dim=-1)  # [B]
             neg_score = torch.sum(seq_output * neg_items_emb, dim=-1)  # [B]
             loss = self.loss_fct(pos_score, neg_score)
-            return loss
+            # return loss
         else:  # self.loss_type = 'CE'
             test_item_emb = self.item_embedding.weight
             logits = torch.matmul(seq_output, test_item_emb.transpose(0, 1))
             loss = self.loss_fct(logits, pos_items)
+            # return loss
+
+        # if 'SSL_AUG' in self.config:
+        if self.config['method'] == 'CL4SRec':
+            aug_item_seq1, aug_len1, aug_item_seq2, aug_len2 = \
+                interaction['aug1'], interaction['aug_len1'], interaction['aug2'], interaction['aug_len2']
+            seq_output1 = self.forward(aug_item_seq1, aug_len1)
+            seq_output2 = self.forward(aug_item_seq2, aug_len2)
+
+            nce_logits, nce_labels = self.info_nce(seq_output1, seq_output2, temp=self.config['temp_ratio'], batch_size=aug_len1.shape[0])
+
+            nce_loss = self.nce_fct(nce_logits, nce_labels)
+            return loss + self.config['cl_loss_weight'] * nce_loss
+        else:
             return loss
 
     def predict(self, interaction):
@@ -140,3 +156,40 @@ class SASRec(SequentialRecommender):
         test_items_emb = self.item_embedding.weight
         scores = torch.matmul(seq_output, test_items_emb.transpose(0, 1))  # [B n_items]
         return scores
+
+    def info_nce(self, z_i, z_j, temp, batch_size):
+        """
+        We do not sample negative examples explicitly.
+        Instead, given a positive pair, similar to (Chen et al., 2017), we treat the other 2(N − 1) augmented examples within a minibatch as negative examples.
+        """
+        N = 2 * batch_size
+
+        z = torch.cat((z_i, z_j), dim=0)
+
+        # if sim == 'cos':
+        #     sim = nn.functional.cosine_similarity(z.unsqueeze(1), z.unsqueeze(0), dim=2) / temp
+        # elif sim == 'dot':
+        sim = torch.mm(z, z.T) / temp
+
+        sim_i_j = torch.diag(sim, batch_size)
+        sim_j_i = torch.diag(sim, -batch_size)
+
+        positive_samples = torch.cat((sim_i_j, sim_j_i), dim=0).reshape(N, 1)
+        # if batch_size != self.config['train_batch_size']:
+        #     mask = self.mask_correlated_samples(batch_size)
+        # else:
+        mask = self.mask_correlated_samples(batch_size)
+        negative_samples = sim[mask].reshape(N, -1)
+
+        labels = torch.zeros(N).to(positive_samples.device).long()
+        logits = torch.cat((positive_samples, negative_samples), dim=1)
+        return logits, labels
+
+    def mask_correlated_samples(self, batch_size):
+        N = 2 * batch_size
+        mask = torch.ones((N, N), dtype=bool)
+        mask = mask.fill_diagonal_(0)
+        for i in range(batch_size):
+            mask[i, batch_size + i] = 0
+            mask[batch_size + i, i] = 0
+        return mask
