@@ -7,7 +7,6 @@ Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequent
 
 **09/17/2022**: We updated SASRec and CL4SRec.
 
-
 ## EC4SRec To-Do list
 
 - [x] Update SASRec.

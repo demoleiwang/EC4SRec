@@ -35,7 +35,6 @@ eval_batch_size: 256
 weight_decay: 0
 topk: [5, 10, 20]
 
-
 log_root: "./log/"
 data_path: "./dataset/"
 
