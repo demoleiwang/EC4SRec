@@ -38,6 +38,7 @@ class SASRec(SequentialRecommender):
 
         self.config = config
         self.nce_fct = nn.CrossEntropyLoss()
+
         # load parameters info
         self.n_layers = config['n_layers']
         self.n_heads = config['n_heads']
