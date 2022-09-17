@@ -28,15 +28,15 @@ Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequent
 |------------------|----------|-----------|-----------|--------|---------|---------|
 | SASRec           |          |           |           |        |         |         |
 | CL4SRec          |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | CoSeRec          |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | ContraRec        |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
-| DuoRec        |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
+| DuoRec           |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | ICL              |          |           |           |        |         |         |
-| EC4SRec (Ours)   |          |           |           |        |         |         |
+| EC4SRec          |          |           |           |        |         |         |
 
 
 
@@ -45,15 +45,15 @@ Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequent
 |------------------|----------|-----------|-----------|--------|---------|---------|
 | SASRec           |          |           |           |        |         |         |
 | CL4SRec          |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | CoSeRec          |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | ContraRec        |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
-| DuoRec        |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
+| DuoRec           |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | ICL              |          |           |           |        |         |         |
-| EC4SRec (Ours)   |          |           |           |        |         |         |
+| EC4SRec          |          |           |           |        |         |         |
 
 
 
@@ -62,15 +62,15 @@ Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequent
 |------------------|----------|-----------|-----------|--------|---------|---------|
 | SASRec           |          |           |           |        |         |         |
 | CL4SRec          |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | CoSeRec          |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | ContraRec        |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
-| DuoRec        |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
+| DuoRec           |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | ICL              |          |           |           |        |         |         |
-| EC4SRec (Ours)   |          |           |           |        |         |         |
+| EC4SRec          |          |           |           |        |         |         |
 
 
 
@@ -79,15 +79,15 @@ Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequent
 |------------------|----------|-----------|-----------|--------|---------|---------|
 | SASRec           |          |           |           |        |         |         |
 | CL4SRec          |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | CoSeRec          |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | ContraRec        |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
-| DuoRec        |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
+| DuoRec           |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | ICL              |          |           |           |        |         |         |
-| EC4SRec (Ours)   |          |           |           |        |         |         |
+| EC4SRec          |          |           |           |        |         |         |
 
 
 
@@ -96,12 +96,12 @@ Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequent
 |------------------|----------|-----------|-----------|--------|---------|---------|
 | SASRec           |          |           |           |        |         |         |
 | CL4SRec          |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | CoSeRec          |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | ContraRec        |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
-| DuoRec        |          |           |           |        |         |         |
-|  w/ X-Aug (Ours) |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
+| DuoRec           |          |           |           |        |         |         |
+|  w/ X-Aug        |          |           |           |        |         |         |
 | ICL              |          |           |           |        |         |         |
-| EC4SRec (Ours)   |          |           |           |        |         |         |
+| EC4SRec          |          |           |           |        |         |         |
