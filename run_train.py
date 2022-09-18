@@ -42,4 +42,5 @@ if __name__ == '__main__':
     }
 
     config_file_list = args.config_files.strip().split(' ') if args.config_files else None
-    run_recbole(model=args.model, dataset=args.dataset, config_file_list=config_file_list, config_dict=config_dict)
+    run_recbole(model=args.model, dataset=args.dataset, method=args.method,
+                config_file_list=config_file_list, config_dict=config_dict)

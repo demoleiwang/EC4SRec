@@ -114,21 +114,21 @@ class TrainDataLoader(NegSampleDataLoader):
                 aug_seq = seq
                 aug_len = length
             if switch[0] == 0:
-                aug_seq, aug_len = item_crop(seq.clone(), length.clone())
+                aug_seq, aug_len = item_crop(seq.clone(), length.clone(), eta=self.config['eta'])
             elif switch[0] == 1:
-                aug_seq, aug_len = item_mask(seq.clone(), length.clone())
+                aug_seq, aug_len = item_mask(seq.clone(), length.clone(), gamma=self.config['gamma'])
             elif switch[0] == 2:
-                aug_seq, aug_len = item_reorder(seq.clone(), length.clone())
+                aug_seq, aug_len = item_reorder(seq.clone(), length.clone(), beta=self.config['beta'])
 
             aug_seq1.append(aug_seq)
             aug_len1.append(aug_len)
 
             if switch[1] == 0:
-                aug_seq, aug_len = item_crop(seq.clone(), length.clone())
+                aug_seq, aug_len = item_crop(seq.clone(), length.clone(), eta=self.config['eta'])
             elif switch[1] == 1:
-                aug_seq, aug_len = item_mask(seq.clone(), length.clone())
+                aug_seq, aug_len = item_mask(seq.clone(), length.clone(), gamma=self.config['gamma'])
             elif switch[1] == 2:
-                aug_seq, aug_len = item_reorder(seq.clone(), length.clone())
+                aug_seq, aug_len = item_reorder(seq.clone(), length.clone(), beta=self.config['beta'])
 
             aug_seq2.append(aug_seq)
             aug_len2.append(aug_len)

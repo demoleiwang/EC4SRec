@@ -17,7 +17,7 @@ from recbole.data import create_dataset, data_preparation, save_split_dataloader
 from recbole.utils import init_logger, get_model, get_trainer, init_seed, set_color
 
 
-def run_recbole(model=None, dataset=None, config_file_list=None, config_dict=None, saved=True):
+def run_recbole(model=None, dataset=None, method=None, config_file_list=None, config_dict=None, saved=True):
     r""" A fast running api, which includes the complete process of
     training and testing a model on a specified dataset
 
@@ -29,7 +29,7 @@ def run_recbole(model=None, dataset=None, config_file_list=None, config_dict=Non
         saved (bool, optional): Whether to save the model. Defaults to ``True``.
     """
     # configurations initialization
-    config = Config(model=model, dataset=dataset, config_file_list=config_file_list, config_dict=config_dict)
+    config = Config(model=model, dataset=dataset, method=method, config_file_list=config_file_list, config_dict=config_dict)
     init_seed(config['seed'], config['reproducibility'])
     # logger initialization
     init_logger(config)

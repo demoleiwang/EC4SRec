@@ -55,7 +55,7 @@ class Config(object):
     Finally the learning_rate is equal to 0.02.
     """
 
-    def __init__(self, model=None, dataset=None, config_file_list=None, config_dict=None):
+    def __init__(self, model=None, dataset=None, method=None, config_file_list=None, config_dict=None):
         """
         Args:
             model (str/AbstractRecommender): the model name or the model class, default is None, if it is None, config
@@ -73,7 +73,8 @@ class Config(object):
         self._merge_external_config_dict()
 
         self.model, self.model_class, self.dataset = self._get_model_and_dataset(model, dataset)
-        self._load_internal_config_dict(self.model, self.model_class, self.dataset)
+        self.method = method
+        self._load_internal_config_dict(self.model, self.model_class, self.dataset, self.method)
         self.final_config_dict = self._get_final_config_dict()
         self._set_default_parameters()
         self._init_device()
@@ -208,12 +209,13 @@ class Config(object):
                 self.internal_config_dict.update(config_dict)
         return config_dict
 
-    def _load_internal_config_dict(self, model, model_class, dataset):
+    def _load_internal_config_dict(self, model, model_class, dataset, method):
         current_path = os.path.dirname(os.path.realpath(__file__))
         overall_init_file = os.path.join(current_path, '../properties/overall.yaml')
         model_init_file = os.path.join(current_path, '../properties/model/' + model + '.yaml')
         sample_init_file = os.path.join(current_path, '../properties/dataset/sample.yaml')
         dataset_init_file = os.path.join(current_path, '../properties/dataset/' + dataset + '.yaml')
+        method_init_file = os.path.join(current_path, f'../properties/methods/{method}.{model}.{dataset}.yaml')
 
         quick_start_config_path = os.path.join(current_path, '../properties/quick_start_config/')
         context_aware_init = os.path.join(quick_start_config_path, 'context-aware.yaml')
@@ -226,7 +228,7 @@ class Config(object):
         knowledge_base_init = os.path.join(quick_start_config_path, 'knowledge_base.yaml')
 
         self.internal_config_dict = dict()
-        for file in [overall_init_file, model_init_file, sample_init_file, dataset_init_file]:
+        for file in [overall_init_file, model_init_file, sample_init_file, dataset_init_file, method_init_file]:
             if os.path.isfile(file):
                 config_dict = self._update_internal_config_dict(file)
                 if file == dataset_init_file:
