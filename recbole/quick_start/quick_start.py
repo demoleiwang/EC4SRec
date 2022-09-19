@@ -54,7 +54,7 @@ def run_recbole(model=None, dataset=None, method=None, config_file_list=None, co
 
     # model training
     best_valid_score, best_valid_result = trainer.fit(
-        train_data, valid_data, saved=saved, show_progress=config['show_progress']
+        train_data, valid_data, test_data, saved=saved, show_progress=config['show_progress']
     )
 
     # model evaluation

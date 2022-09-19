@@ -62,11 +62,20 @@ class TrainDataLoader(NegSampleDataLoader):
     def _shuffle(self):
         self.dataset.shuffle()
 
+    def update_start(self, start_flag):
+        self.start_flag = start_flag
+
     def _next_batch_data(self):
         cur_data = self._neg_sampling(self.dataset[self.pr:self.pr + self.step])
 
         if self.config['method'] == 'CL4SRec':
             self.cl4srec_aug(cur_data)
+        if self.config['method'] == 'CL4SRec_XAUG':
+            if self.start_flag == 0:
+                pass
+                # self.cl4srec_aug(cur_data)
+            else:
+                self.cl4srec_aug_x(cur_data)
 
         self.pr += self.step
         return cur_data
@@ -135,6 +144,163 @@ class TrainDataLoader(NegSampleDataLoader):
 
         cur_data.update(Interaction({'aug1': torch.stack(aug_seq1), 'aug_len1': torch.stack(aug_len1),
                                      'aug2': torch.stack(aug_seq2), 'aug_len2': torch.stack(aug_len2)}))
+
+    def cl4srec_aug_x(self, cur_data):
+        def item_crop(seq, length, attribution_score, eta=0.6):
+            num_left = math.floor(length * eta)
+            if num_left < 1:
+                num_left = 1
+
+            sorted_attribution_index = np.argsort(attribution_score[:length])
+            crop_ids = list(sorted_attribution_index[-num_left:].numpy())
+            croped_item_seq = np.zeros(seq.shape[0])
+            croped_item_seq[:num_left] = seq[crop_ids]
+
+
+            return torch.tensor(croped_item_seq, dtype=torch.long), torch.tensor(num_left, dtype=torch.long)
+
+        def item_crop_neg(seq, length, attribution_score, eta=0.6):
+            num_left = math.floor(length * eta)
+            if num_left < 1:
+                num_left = 1
+            sorted_attribution_index = np.argsort(attribution_score[:length])
+            crop_ids = list(sorted_attribution_index[:num_left].numpy())
+            croped_item_seq = np.zeros(seq.shape[0])
+            croped_item_seq[:num_left] = seq[crop_ids]
+            return torch.tensor(croped_item_seq, dtype=torch.long), torch.tensor(num_left, dtype=torch.long)
+
+        def item_mask(seq, length, attribution_score, gamma=0.3):
+            num_mask = math.floor(length * (1 - gamma))
+            if num_mask < 1:
+                num_mask = 1
+
+            sorted_attribution_index = np.argsort(attribution_score[:length]).numpy()
+            mask_index = list(sorted_attribution_index[
+                              :num_mask])  # random.sample(list(sorted_attribution_index[:int(length / 2)].numpy()), k=num_mask)
+
+            masked_item_seq = seq[:]
+            masked_item_seq[mask_index] = 0  # self.dataset.item_num  # token 0 has been used for semantic masking
+            return masked_item_seq, length
+
+        def item_mask_neg(seq, length, attribution_score, gamma=0.3):
+            num_mask = math.floor(length * (1 - gamma))
+            if num_mask < 1:
+                num_mask = 1
+            sorted_attribution_index = np.argsort(attribution_score[:length]).numpy()
+            mask_index = list(sorted_attribution_index[
+                              -num_mask:])  # random.sample(list(sorted_attribution_index[int(length / 2):].numpy()), k=num_mask)
+            masked_item_seq = seq[:]
+            masked_item_seq[mask_index] = 0  # self.dataset.item_num  # token 0 has been used for semantic masking
+            return masked_item_seq, length
+
+        def item_reorder(seq, length, attribution_score, beta=0.6):
+            num_reorder = math.floor(length * (1 - beta))
+            if num_reorder < 1:
+                num_reorder = 1
+
+            sorted_attribution_index = np.argsort(attribution_score[:length])
+            reorder_ids = list(sorted_attribution_index[:num_reorder].numpy())
+            reorder_shuffle = list(range(len(reorder_ids)))
+            random.shuffle(reorder_shuffle)
+            sub_seq = seq[reorder_ids][reorder_shuffle]
+            seq[reorder_ids] = sub_seq
+
+            return seq, length
+
+        def item_reorder_neg(seq, length, attribution_score, beta=0.6):
+            num_reorder = math.floor(length * (1 - beta))
+            if num_reorder < 1:
+                num_reorder = 1
+            sorted_attribution_index = np.argsort(attribution_score[:length])
+            reorder_ids = list(sorted_attribution_index[-num_reorder:].numpy())
+            reorder_shuffle = list(range(len(reorder_ids)))
+            random.shuffle(reorder_shuffle)
+            sub_seq = seq[reorder_ids][reorder_shuffle]
+            seq[reorder_ids] = sub_seq
+            return seq, length
+
+        seqs = cur_data['item_id_list'].clone()
+        lengths = cur_data['item_length'].clone()
+        # if self.clxai4srec_aug_type == 'popularity':
+        #     attribution_scores = cur_data['popularity_attribution_scores'].clone()
+        # elif self.clxai4srec_aug_type in ['saliency', 'ig', 'occlusion']:
+        #     attribution_scores = cur_data['xai_attribution_scores'].clone()
+        attribution_scores = cur_data['attribution_scores'].clone()
+
+        aug_seq1 = []
+        aug_len1 = []
+        aug_seq2 = []
+        aug_len2 = []
+        neg_seq_ = []
+        neg_seq_len_ = []
+        for seq, length, attribution_score in zip(seqs, lengths, attribution_scores):
+            if length > 1:
+                switch = random.sample(range(3), k=2)
+                neg_switch = random.sample(range(3), k=1)
+
+            else:
+                switch = [3, 3]
+                aug_seq = seq
+                aug_len = length
+
+                neg_switch = [3]
+                neg_seq = torch.zeros(seq.size(0), dtype=int)
+                random_value = min(1, int(random.random() * (self.dataset.item_num - 1)))
+                neg_seq[0] = random_value
+                neg_seq_len = length
+
+            if switch[0] == 0:
+                aug_seq, aug_len = item_crop(seq.clone(), length.clone(), attribution_score, self.config['pos_r'])
+                # aug_seq, aug_len = item_crop(seq.clone(), length.clone(), attribution_score, 0.3)
+            elif switch[0] == 1:
+                aug_seq, aug_len = item_mask(seq.clone(), length.clone(), attribution_score, self.config['pos_r'])
+                # aug_seq, aug_len = item_mask(seq.clone(), length.clone(), attribution_score, 0.5)
+            elif switch[0] == 2:
+                aug_seq, aug_len = item_reorder(seq.clone(), length.clone(), attribution_score,
+                                                self.config['pos_r'])
+                # aug_seq, aug_len = item_reorder(seq.clone(), length.clone(), attribution_score, 0.7)
+
+            aug_seq1.append(aug_seq)
+            aug_len1.append(aug_len)
+
+            if switch[1] == 0:
+                aug_seq, aug_len = item_crop(seq.clone(), length.clone(), attribution_score, self.config['pos_r'])
+                # aug_seq, aug_len = item_crop(seq.clone(), length.clone(), attribution_score, 0.3)
+            elif switch[1] == 1:
+                aug_seq, aug_len = item_mask(seq.clone(), length.clone(), attribution_score, self.config['pos_r'])
+                # aug_seq, aug_len = item_mask(seq.clone(), length.clone(), attribution_score, 0.5)
+            elif switch[1] == 2:
+                aug_seq, aug_len = item_reorder(seq.clone(), length.clone(), attribution_score,
+                                                self.config['pos_r'])
+                # aug_seq, aug_len = item_reorder(seq.clone(), length.clone(), attribution_score, 0.7)
+
+            aug_seq2.append(aug_seq)
+            aug_len2.append(aug_len)
+
+            if neg_switch[0] == 0:
+                neg_seq, neg_seq_len = item_crop_neg(seq.clone(), length.clone(), attribution_score,
+                                                     self.config['neg_r'])
+                # neg_seq, neg_seq_len = item_crop_neg(seq.clone(), length.clone(), attribution_score, 0.7)
+            elif neg_switch[0] == 1:
+                neg_seq, neg_seq_len = item_mask_neg(seq.clone(), length.clone(), attribution_score,
+                                                     self.config['neg_r'])
+                # neg_seq, neg_seq_len = item_mask_neg(seq.clone(), length.clone(), attribution_score, 0.5)
+            elif neg_switch[0] == 2:
+                neg_seq, neg_seq_len = item_reorder_neg(seq.clone(), length.clone(), attribution_score,
+                                                        self.config['neg_r'])
+                # neg_seq, neg_seq_len = item_reorder_neg(seq.clone(), length.clone(), attribution_score, 0.3)
+
+            neg_seq_.append(neg_seq)
+            neg_seq_len_.append(neg_seq_len)
+
+        cur_data.update(Interaction({'aug1': torch.stack(aug_seq1), 'aug_len1': torch.stack(aug_len1),
+                                     'aug2': torch.stack(aug_seq2), 'aug_len2': torch.stack(aug_len2),
+                                     'aug_neg': torch.stack(neg_seq_), 'aug_neg_len': torch.stack(neg_seq_len_)}))
+
+
+    def update_xai_info(self, examples_attribution):
+        self.examples_attribution_xai = examples_attribution
+        self.dataset.inter_feat.update(Interaction({'attribution_scores': examples_attribution}))
 
 
 class NegSampleEvalDataLoader(NegSampleDataLoader):

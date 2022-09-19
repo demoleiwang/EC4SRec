@@ -20,13 +20,11 @@ user_inter_num_interval: "[5,inf)"
 item_inter_num_interval: "[5,inf)"
 
 # training settings
-epochs: 100
-train_batch_size: 2048
 learner: adam
 learning_rate: 0.001
 training_neg_sample_num: 0
 eval_step: 1
-stopping_step: 10
+stopping_step: 30
 # evalution settings
 eval_setting: TO_LS,full
 metrics: ["Recall", "NDCG"]

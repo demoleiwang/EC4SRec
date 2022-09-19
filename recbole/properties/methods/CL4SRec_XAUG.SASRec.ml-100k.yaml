@@ -1,0 +1,6 @@
+pos_r: 0.3
+neg_r: 0.7
+pos_cl_loss_weight: 0.1
+neg_cl_loss_weight: 0.05
+update_xai_epoch: [15, 30]
+train_batch_size: 256

@@ -33,6 +33,10 @@ from recbole.evaluator import Evaluator, Collector
 from recbole.utils import ensure_dir, get_local_time, early_stopping, calculate_valid_score, dict2str, \
     EvaluatorType, KGDataLoaderState, get_tensorboard, set_color, get_gpu_usage, WandbLogger
 
+from captum.attr import Saliency, IntegratedGradients, Lime, Occlusion
+import math
+import random
+import copy
 
 class AbstractTrainer(object):
     r"""Trainer Class is used to manage the training and evaluation processes of recommender system models.
@@ -305,7 +309,7 @@ class Trainer(AbstractTrainer):
 
         self.tensorboard.add_hparams(hparam_dict, {'hparam/best_valid_result': best_valid_result})
 
-    def fit(self, train_data, valid_data=None, verbose=True, saved=True, show_progress=False, callback_fn=None):
+    def fit(self, train_data, valid_data=None, test_data=None, verbose=True, saved=True, show_progress=False, callback_fn=None):
         r"""Train the model based on the train data and the valid data.
 
         Args:
@@ -329,7 +333,21 @@ class Trainer(AbstractTrainer):
             train_data.get_model(self.model)
         valid_step = 0
 
+        train_data.update_start(0)
+
         for epoch_idx in range(self.start_epoch, self.epochs):
+
+            # if epoch_idx % 5 == 0:
+            #     if self.config['method'] == 'CL4SRec':
+            #         self.cl4srec_aug_func(train_data)
+
+            if self.config['method'] in ['CL4SRec_XAUG'] \
+                    and epoch_idx in self.config['update_xai_epoch']:
+                train_data.update_start(0)
+                self.model.update_start(0)
+                self.xai_attribute(train_data, epoch_idx, exp_name=self.config['xai_method'], show_progress=True)
+                train_data.update_start(1)
+                self.model.update_start(1)
             # train
             training_start_time = time()
             train_loss = self._train_epoch(train_data, epoch_idx, show_progress=show_progress)
@@ -368,6 +386,9 @@ class Trainer(AbstractTrainer):
                 self.tensorboard.add_scalar('Vaild_score', valid_score, epoch_idx)
                 self.wandblogger.log_metrics({**valid_result, 'valid_step': valid_step}, head='valid')
 
+                test_result = self.evaluate(test_data, load_best_model=False, show_progress=True)
+                self.logger.info(set_color('test result', 'red') + f': {test_result}')
+
                 if update_flag:
                     if saved:
                         self._save_checkpoint(epoch_idx, verbose=verbose)
@@ -387,6 +408,169 @@ class Trainer(AbstractTrainer):
 
         self._add_hparam_to_tensorboard(self.best_valid_score)
         return self.best_valid_score, self.best_valid_result
+
+    @torch.no_grad()
+    def xai_attribute(self, train_data, epoch_idx, exp_name, show_progress=False, train_flag=1):
+
+        model = copy.deepcopy(self.model)
+        model = model.to(self.config['device'])
+        model = model.eval()
+
+        def summarize_attributions(attributions):
+            attributions = attributions.sum(dim=-1).squeeze(0)
+            attributions = attributions / torch.norm(attributions)
+            return attributions
+
+        def forward_func_n(item_seq_emb, item_seq, item_seq_len, user, model):
+            if self.config['model'] in ['SASRec', 'GRU4Rec']:
+                seq_output = model.forward_captum(item_seq, item_seq_emb, item_seq_len)
+
+            elif self.config['model'] == 'BERT4Rec':
+                seq_output = model.forward_captum(item_seq, item_seq_emb)
+                seq_output = model.gather_indexes(seq_output, item_seq_len)
+
+            elif self.config['model'] == 'Caser':
+                seq_output = model.forward_captum(item_seq, item_seq_emb, user)
+            test_items_emb = model.item_embedding.weight
+            scores = torch.matmul(seq_output, test_items_emb.transpose(0, 1))
+            return scores.max(1).values
+
+        if exp_name == 'saliency':
+            exp_model = Saliency(forward_func_n)
+
+        elif exp_name == 'occlusion':
+            exp_model = Occlusion(forward_func_n)
+
+        iter_data = (
+            tqdm(
+                train_data,
+                total=len(train_data),
+                ncols=100,
+                desc=set_color(f"Explanation Generation {epoch_idx:>5}", 'pink'),
+            ) if show_progress else train_data
+        )
+
+        attributions_sum_total = []
+
+        for batch_idx, batched_data in enumerate(iter_data):
+            if train_flag == 1:
+                interaction = batched_data.to(self.config['device'])
+            else:
+                interaction, history_index, positive_u, positive_i = batched_data
+                interaction = interaction.to(self.config['device'])
+
+            item_seq = interaction[model.ITEM_SEQ]
+            item_seq_len = interaction[model.ITEM_SEQ_LEN]
+            user = interaction[model.USER_ID]
+
+            if self.config['model'] == 'BERT4Rec':
+                item_seq = model.reconstruct_test_data(item_seq, item_seq_len)
+
+            if exp_name == 'saliency':
+                # print('prompt: saliency')
+                item_seq_emb = model.item_embedding(item_seq)
+                attributions = exp_model.attribute(inputs=item_seq_emb,
+                                                  additional_forward_args=(
+                                                      item_seq, item_seq_len, user, model))
+                attributions_sum = summarize_attributions(attributions)
+
+            elif exp_name == 'occlusion':
+                item_seq_emb = model.item_embedding(item_seq)
+                attributions = exp_model.attribute(inputs=item_seq_emb,
+                                                   additional_forward_args=(
+                                                       item_seq, item_seq_len, user, model),
+                                                   sliding_window_shapes=(1, item_seq_emb.size(-1)))
+                attributions_sum = summarize_attributions(attributions)  # batch, inputs,
+
+            else:
+                assert 1==0, 'explanation methods missing!'
+
+            attributions_sum_total.append(attributions_sum.detach().cpu().numpy())
+
+        attributions_sum_total = np.concatenate(attributions_sum_total, axis=0)
+
+        attributions_sum_total = attributions_sum_total
+
+        train_data.update_xai_info(attributions_sum_total)
+
+    def cl4srec_aug_func(self, train_data, show_progress=True):
+        def item_crop(seq, length, eta=0.9):
+            num_left = math.floor(length * eta)
+            crop_begin = random.randint(0, length - num_left)
+            croped_item_seq = np.zeros(seq.shape[0])
+            if crop_begin + num_left < seq.shape[0]:
+                croped_item_seq[:num_left] = seq[crop_begin:crop_begin + num_left]
+            else:
+                croped_item_seq[:num_left] = seq[crop_begin:]
+            return torch.tensor(croped_item_seq, dtype=torch.long), torch.tensor(num_left, dtype=torch.long)
+
+        def item_mask(seq, length, gamma=0.1):
+            num_mask = math.floor(length * gamma)
+            mask_index = random.sample(range(length), k=num_mask)
+            masked_item_seq = seq[:]
+            masked_item_seq[mask_index] = 0  # self.dataset.item_num  # token 0 has been used for semantic masking
+            return masked_item_seq, length
+
+        def item_reorder(seq, length, beta=0.1):
+            num_reorder = math.floor(length * beta)
+            reorder_begin = random.randint(0, length - num_reorder)
+            reordered_item_seq = seq[:]
+            shuffle_index = list(range(reorder_begin, reorder_begin + num_reorder))
+            random.shuffle(shuffle_index)
+            reordered_item_seq[reorder_begin:reorder_begin + num_reorder] = reordered_item_seq[shuffle_index]
+            return reordered_item_seq, length
+
+        iter_data = (
+            tqdm(
+                train_data,
+                total=len(train_data),
+                ncols=100,
+                desc=set_color(f"cl4srec_aug_func preparation", 'pink'),
+            ) if show_progress else train_data
+        )
+        aug_seq1 = []
+        aug_len1 = []
+        aug_seq2 = []
+        aug_len2 = []
+
+        for batch_idx, batched_data in enumerate(iter_data):
+            interaction = batched_data#.to(self.config['device'])
+
+            seqs = interaction[self.model.ITEM_SEQ].clone()
+            lengths = interaction[self.model.ITEM_SEQ_LEN].clone()
+            # seqs = seqs.cpu().numpy()
+            # lengths = lengths.cpu().numpy()
+
+            for seq, length in zip(seqs, lengths):
+                if length > 1:
+                    switch = random.sample(range(3), k=2)
+                else:
+                    switch = [3, 3]
+                    aug_seq = seq
+                    aug_len = length
+                if switch[0] == 0:
+                    aug_seq, aug_len = item_crop(seq.clone(), length.clone(), eta=self.config['eta'])
+                elif switch[0] == 1:
+                    aug_seq, aug_len = item_mask(seq.clone(), length.clone(), gamma=self.config['gamma'])
+                elif switch[0] == 2:
+                    aug_seq, aug_len = item_reorder(seq.clone(), length.clone(), beta=self.config['beta'])
+
+                aug_seq1.append(aug_seq)
+                aug_len1.append(aug_len)
+
+                if switch[1] == 0:
+                    aug_seq, aug_len = item_crop(seq.clone(), length.clone(), eta=self.config['eta'])
+                elif switch[1] == 1:
+                    aug_seq, aug_len = item_mask(seq.clone(), length.clone(), gamma=self.config['gamma'])
+                elif switch[1] == 2:
+                    aug_seq, aug_len = item_reorder(seq.clone(), length.clone(), beta=self.config['beta'])
+
+                aug_seq2.append(aug_seq)
+                aug_len2.append(aug_len)
+
+        train_data.dataset.inter_feat.update(Interaction({'aug1': torch.stack(aug_seq1), 'aug_len1': torch.stack(aug_len1),
+                                     'aug2': torch.stack(aug_seq2), 'aug_len2': torch.stack(aug_len2)}))
+
 
     def _full_sort_batch_eval(self, batched_data):
         interaction, history_index, positive_u, positive_i = batched_data

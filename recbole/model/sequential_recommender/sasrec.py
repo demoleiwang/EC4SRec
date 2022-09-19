@@ -22,6 +22,28 @@ from recbole.model.abstract_recommender import SequentialRecommender
 from recbole.model.layers import TransformerEncoder
 from recbole.model.loss import BPRLoss
 
+import torch.nn.functional as F
+def supcon_fake(out1, out2, others, temperature=0.1,):
+    N = out1.size(0)
+
+    _out = [out1, out2, others]
+    outputs = torch.cat(_out, dim=0)
+    sim_matrix = outputs @ outputs.t()
+    sim_matrix = sim_matrix / temperature
+    sim_matrix.fill_diagonal_(-5e4)
+
+    mask = torch.zeros_like(sim_matrix)
+    mask[2*N:,2*N:] = 1
+    mask.fill_diagonal_(0)
+
+    sim_matrix = sim_matrix[2*N:]
+    mask = mask[2*N:]
+    mask = mask / mask.sum(1, keepdim=True)
+
+    lsm = F.log_softmax(sim_matrix, dim=1)
+    lsm = lsm * mask
+    d_loss = -lsm.sum(1).mean()
+    return d_loss
 
 class SASRec(SequentialRecommender):
     r"""
@@ -38,6 +60,7 @@ class SASRec(SequentialRecommender):
 
         self.config = config
         self.nce_fct = nn.CrossEntropyLoss()
+        self.start_flag = 0
 
         # load parameters info
         self.n_layers = config['n_layers']
@@ -108,6 +131,7 @@ class SASRec(SequentialRecommender):
         output = self.gather_indexes(output, item_seq_len - 1)
         return output  # [B H]
 
+
     def calculate_loss(self, interaction):
         item_seq = interaction[self.ITEM_SEQ]
         item_seq_len = interaction[self.ITEM_SEQ_LEN]
@@ -128,16 +152,38 @@ class SASRec(SequentialRecommender):
             # return loss
 
         # if 'SSL_AUG' in self.config:
-        if self.config['method'] == 'CL4SRec':
+        if self.config['method'] ==  'CL4SRec':
             aug_item_seq1, aug_len1, aug_item_seq2, aug_len2 = \
                 interaction['aug1'], interaction['aug_len1'], interaction['aug2'], interaction['aug_len2']
             seq_output1 = self.forward(aug_item_seq1, aug_len1)
             seq_output2 = self.forward(aug_item_seq2, aug_len2)
 
-            nce_logits, nce_labels = self.info_nce(seq_output1, seq_output2, temp=self.config['temp_ratio'], batch_size=aug_len1.shape[0])
+            nce_logits, nce_labels = self.info_nce(seq_output1, seq_output2, temp=self.config['temp_ratio'],
+                                                   batch_size=aug_len1.shape[0])
 
             nce_loss = self.nce_fct(nce_logits, nce_labels)
             return loss + self.config['cl_loss_weight'] * nce_loss
+
+        elif self.config['method'] ==  'CL4SRec_XAUG':
+            if self.start_flag == 0:
+                return loss
+            aug_item_seq1, aug_len1, aug_item_seq2, aug_len2, aug_neg_seq, aug_neg_len = \
+                interaction['aug1'], interaction['aug_len1'], interaction['aug2'], interaction[
+                    'aug_len2'], interaction['aug_neg'], interaction['aug_neg_len']
+            seq_output1 = self.forward(aug_item_seq1, aug_len1)
+            seq_output2 = self.forward(aug_item_seq2, aug_len2)
+
+            aug_neg_seq_output = self.forward(aug_neg_seq, aug_neg_len)
+
+            nce_logits, nce_labels = self.info_nce(seq_output1, seq_output2, temp=self.config['temp_ratio'],
+                                                   batch_size=aug_len1.shape[0])
+
+            nce_loss = self.nce_fct(nce_logits, nce_labels)
+
+            neg_loss = supcon_fake(seq_output1, seq_output2, aug_neg_seq_output)
+
+            # return loss + self.lmd * nce_loss + self.nmd * neg_loss
+            return loss + self.config['pos_cl_loss_weight'] * nce_loss + self.config['neg_cl_loss_weight'] * neg_loss
         else:
             return loss
 
@@ -194,3 +240,24 @@ class SASRec(SequentialRecommender):
             mask[i, batch_size + i] = 0
             mask[batch_size + i, i] = 0
         return mask
+
+    def forward_captum(self, item_seq, item_seq_emb, item_seq_len):  # item_seq size is (2,50)
+        position_ids = torch.arange(item_seq.size(1), dtype=torch.long, device=item_seq.device)
+        position_ids = position_ids.unsqueeze(0).expand_as(item_seq)
+        position_embedding = self.position_embedding(position_ids)
+
+        # item_emb = self.item_embedding(item_seq)
+        item_emb = item_seq_emb
+        input_emb = item_emb + position_embedding
+        input_emb = self.LayerNorm(input_emb)
+        input_emb = self.dropout(input_emb)
+
+        extended_attention_mask = self.get_attention_mask(item_seq)
+
+        trm_output = self.trm_encoder(input_emb, extended_attention_mask, output_all_encoded_layers=True)
+        output = trm_output[-1]
+        output = self.gather_indexes(output, item_seq_len - 1)
+        return output  # [B H]
+
+    def update_start(self, start_flag):
+        self.start_flag = start_flag
