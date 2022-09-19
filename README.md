@@ -76,3 +76,14 @@ python run_train.py --dataset=Amazon_Beauty --model=SASRec --method=CL4SRec_XAUG
 |EC4SRec (Occlusion)|         |           |           |        |         |         |
 
 
+
+## Citations
+
+```bibtex
+@article{wang2022explanation,
+  title={Explanation Guided Contrastive Learning for Sequential Recommendation},
+  author={Wang, Lei and Lim, Ee-Peng and Liu, Zhiwei and Zhao, Tianxiang},
+  journal={arXiv preprint arXiv:2209.01347},
+  year={2022}
+}
+```
