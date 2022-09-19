@@ -1,6 +1,6 @@
 
 
-# EC4SRec (Coming Soon)
+# EC4SRec (Updating)
 Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequential Recommendation"
 
 ## EC4SRec News
