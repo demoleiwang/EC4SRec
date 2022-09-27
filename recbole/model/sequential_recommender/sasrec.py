@@ -164,7 +164,7 @@ class SASRec(SequentialRecommender):
             nce_loss = self.nce_fct(nce_logits, nce_labels)
             return loss + self.config['cl_loss_weight'] * nce_loss
 
-        elif self.config['method'] == 'DuoRec':
+        elif self.config['method'] in ['DuoRec', 'DuoRec_XAUG']:
             aug_seq_output = self.forward(item_seq, item_seq_len)
 
             sem_aug, sem_aug_lengths = interaction['sem_aug'], interaction['sem_aug_lengths']

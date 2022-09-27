@@ -17,11 +17,14 @@ import torch
 
 from recbole.data.dataloader.abstract_dataloader import AbstractDataLoader, NegSampleDataLoader
 from recbole.data.interaction import Interaction, cat_interactions
-from recbole.utils import InputType, ModelType
+from recbole.utils import InputType, ModelType, set_color
 
 import math
 import random
 
+from scipy.special import softmax
+import os
+from tqdm import tqdm
 
 class TrainDataLoader(NegSampleDataLoader):
     """:class:`TrainDataLoader` is a dataloader for training.
@@ -40,11 +43,55 @@ class TrainDataLoader(NegSampleDataLoader):
         self._set_neg_sample_args(config, dataset, config['MODEL_INPUT_TYPE'], config['train_neg_sample_args'])
         super().__init__(config, dataset, sampler, shuffle=shuffle)
 
-        if config['method'] in ['DuoRec']:
+        if config['method'] in ['DuoRec', 'DuoRec_XAUG']:
             self.same_target_index = dataset.same_target_index
             self.static_item_id_list = dataset['item_id_list'].detach().clone()
             self.static_item_length = dataset['item_length'].detach().clone()
             self.mapping_index = torch.arange(len(self.static_item_id_list))
+        if config['method'] in ['DuoRec_XAUG']:
+            if not os.path.exists("./saved/temp/"):
+                os.makedirs("./saved/temp/")
+            inter_sect_dir_file = './saved/temp/' + self.config['dataset'] + '_intersect.npy'
+            union_sect_dir_file = './saved/temp/' + self.config['dataset'] + '_union.npy'
+            if os.path.exists(inter_sect_dir_file):  # and self.config['dataset'] != 'ml-1m':
+                self.intersect_target_index = np.load(inter_sect_dir_file, allow_pickle=True)
+                self.union_target_index = np.load(union_sect_dir_file, allow_pickle=True)
+            else: # this is for speeding up
+                union_target_index = []
+                intersect_target_index = []
+                target_items = dataset.inter_feat['item_id']
+                iter_data = tqdm(
+                    self.same_target_index,
+                    total=len(self.same_target_index),
+                    ncols=100,
+                    desc=set_color(f"Prepro   ", 'yellow'), )
+                for target_index, targets in enumerate(iter_data):
+                    o_seq_x = self.static_item_id_list[target_index]
+                    o_seq_x = o_seq_x[:self.static_item_length[target_index]]
+                    cand_seqs = self.static_item_id_list[targets]
+                    cand_lengths = self.static_item_length[targets]
+                    cand_seqs = cand_seqs.cpu().numpy()
+                    cand_lengths = cand_lengths.cpu().numpy()
+                    useful_seq = np.arange(cand_seqs.shape[1])
+                    s_ids_target_index = []
+                    ovelap_items_target_index = []
+                    for cand_i in range(len(cand_seqs)):
+                        cand_seq = cand_seqs[cand_i]
+                        cand_length = cand_lengths[cand_i]
+                        cand_seq_x = cand_seq[:cand_length]
+                        s_ids = useful_seq[:cand_length][np.in1d(cand_seq_x, o_seq_x, assume_unique=True)]
+                        ovelap_items = len(s_ids) * 1.0 / max(len(cand_seq_x),
+                                                              len(o_seq_x))  # np.union1d(cand_seq_x, o_seq_x)
+
+                        s_ids_target_index.append(s_ids)
+                        ovelap_items_target_index.append(ovelap_items)
+
+                    intersect_target_index.append(s_ids_target_index)
+                    union_target_index.append(ovelap_items_target_index)
+                np.save(inter_sect_dir_file, np.array(intersect_target_index))
+                np.save(union_sect_dir_file, np.array(union_target_index))
+                self.intersect_target_index = np.array(intersect_target_index)
+                self.union_target_index = np.array(union_target_index)
 
     def _init_batch_size_and_step(self):
         batch_size = self.config['train_batch_size']
@@ -94,7 +141,7 @@ class TrainDataLoader(NegSampleDataLoader):
             if self.start_flag == 0:
                 pass
             else:
-                self.duoxairec_aug(cur_data, slice(self.pr, self.pr + self.step))
+                self.duoxaiselrec_aug(cur_data, slice(self.pr, self.pr + self.step))
 
         self.pr += self.step
         return cur_data
@@ -328,6 +375,63 @@ class TrainDataLoader(NegSampleDataLoader):
                 null_index.append(i)
             else:
                 sample_pos.append(np.random.choice(targets))
+        sem_pos_seqs = self.static_item_id_list[sample_pos]
+        sem_pos_lengths = self.static_item_length[sample_pos]
+        if null_index:
+            sem_pos_seqs[null_index] = cur_data['item_id_list'][null_index]
+            sem_pos_lengths[null_index] = cur_data['item_length'][null_index]
+
+        cur_data.update(Interaction({'sem_aug': sem_pos_seqs, 'sem_aug_lengths': sem_pos_lengths}))
+
+    def duoxaiselrec_aug(self, cur_data, index):
+        cur_same_target = self.same_target_index[index]
+
+        union_target = self.union_target_index[index]
+        intersect_target = self.intersect_target_index[index]
+
+        null_index = []
+        sample_pos = []
+        for i, targets in enumerate(cur_same_target):
+            if len(targets) == 0:
+                sample_pos.append(-1)
+                null_index.append(i)
+            else:
+                def rewight_distribution(original_distributon, temperature=0.5):
+                    distribution = np.log(original_distributon) / temperature
+                    distribution = np.exp(distribution)
+                    return distribution / np.sum(distribution)
+
+                cand_seqs = self.static_item_id_list[targets]
+                cand_lengths = self.static_item_length[targets]
+                cand_attributions = self.duorec_attribution_xai[targets]
+                utility_scores_1 = []
+                utility_scores_2 = []
+
+                cand_sorted_indices = np.arange(len(cand_seqs))
+                targets_c = targets
+
+                for cand_i in cand_sorted_indices:
+                    cand_length = cand_lengths[cand_i]
+                    cand_attribution_x = cand_attributions[cand_i][:cand_length]
+
+                    s_ids = intersect_target[i][cand_i]
+
+                    if len(s_ids) == 0:
+                        utility_x = 0.01
+                    else:
+                        utility_x = np.sum(cand_attribution_x[s_ids])
+
+                    utility_scores_1.append(utility_x)
+
+                    utility_sim = union_target[i][cand_i]
+                    utility_scores_2.append(utility_sim)
+
+                utility_scores = np.multiply(np.exp(np.array(utility_scores_1)), np.array(utility_scores_2))
+                utility_p = softmax(utility_scores)
+
+                utility_p = rewight_distribution(utility_p, self.config['duo_temp'])
+
+                sample_pos.append(np.random.choice(targets_c, p=utility_p))
         sem_pos_seqs = self.static_item_id_list[sample_pos]
         sem_pos_lengths = self.static_item_length[sample_pos]
         if null_index:
