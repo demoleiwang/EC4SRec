@@ -139,7 +139,7 @@ class TrainDataLoader(NegSampleDataLoader):
             self.duorec_aug(cur_data, slice(self.pr, self.pr + self.step))
         if self.config['method'] == 'DuoRec_XAUG':
             if self.start_flag == 0:
-                pass
+                self.duorec_aug(cur_data, slice(self.pr, self.pr + self.step))
             else:
                 self.duoxaiselrec_aug(cur_data, slice(self.pr, self.pr + self.step))
 
@@ -444,7 +444,7 @@ class TrainDataLoader(NegSampleDataLoader):
         self.examples_attribution_xai = examples_attribution
         self.dataset.inter_feat.update(Interaction({'attribution_scores': examples_attribution}))
 
-        if self.config['SSL_AUG'] in ['DuoRec_XAUG', 'EC4SRec']:
+        if self.config['method'] in ['DuoRec_XAUG', 'EC4SRec']:
             reverse_index = torch.sort(self.mapping_index)[-1]
             self.duorec_attribution_xai = examples_attribution[reverse_index]
             average_v = np.sum(self.duorec_attribution_xai) / torch.sum(self.static_item_length).item()
