@@ -19,7 +19,7 @@ Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequent
 - [ ] Update ContraRec.
 - [ ] Update ContraRec w/ X-Aug (Ours).
 - [x] Update DuoRec.
-- [ ] Update DuoRec w/ X-Aug (Ours).
+- [x] Update DuoRec w/ X-Aug (Ours).
 - [ ] Update ICL.
 - [ ] Update EC4SRec (Ours).
 
@@ -40,6 +40,11 @@ Command for DuoRec
 python run_train.py --dataset=ml-100k --model=SASRec --method=DuoRec --gpu_id=2
 python run_train.py --dataset=Amazon_Beauty --model=SASRec --method=DuoRec --gpu_id=12
 ~~~
+Command for DuoRec w/ X-Aug (Ours)
+~~~
+python run_train.py --dataset=ml-100k --model=SASRec --method=DuoRec_XAUG --xai_method=occlusion --gpu_id=2
+python run_train.py --dataset=Amazon_Beauty --model=SASRec --method=DuoRec_XAUG --xai_method=occlusion --gpu_id=12
+~~~
 
 ## Performance
 
@@ -55,9 +60,10 @@ python run_train.py --dataset=Amazon_Beauty --model=SASRec --method=DuoRec --gpu
 | ContraRec        |          |           |           |        |         |         |
 |+X-Aug (Occlusion)|          |           |           |        |         |         |
 | DuoRec           |0.0764    |0.1198     |0.2216     |0.0462  |0.0602   |0.0860   |
-|+X-Aug (Occlusion)|          |           |           |        |         |         |
+|+X-Aug (Occlusion)|0.0753    |0.1315     |0.2238     |0.0456  |0.0633   |0.0866   |
 | ICL              |          |           |           |        |         |         |
 |EC4SRec (Occlusion)|         |           |           |        |         |         |
+
 
 
 
