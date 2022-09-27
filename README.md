@@ -25,15 +25,20 @@ Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequent
 
 ## Quick Start
 
-Command for CL4SRec over SASRec 
+Command for CL4SRec 
 ~~~
 python run_train.py --dataset=ml-100k --model=SASRec --method=CL4SRec --gpu_id=13
 python run_train.py --dataset=Amazon_Beauty --model=SASRec --method=CL4SRec --gpu_id=4
 ~~~
-Command for CL4SRec w/ X-Aug (Ours) over SASRec
+Command for CL4SRec w/ X-Aug (Ours)
 ~~~
 python run_train.py --dataset=ml-100k --model=SASRec --method=CL4SRec_XAUG --xai_method=occlusion --gpu_id=2
 python run_train.py --dataset=Amazon_Beauty --model=SASRec --method=CL4SRec_XAUG --xai_method=occlusion --gpu_id=12
+~~~
+Command for DuoRec
+~~~
+python run_train.py --dataset=ml-100k --model=SASRec --method=DuoRec --gpu_id=2
+python run_train.py --dataset=Amazon_Beauty --model=SASRec --method=DuoRec --gpu_id=12
 ~~~
 
 ## Performance
