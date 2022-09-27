@@ -18,7 +18,7 @@ Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequent
 - [ ] Update CoSeRec w/ X-Aug (Ours).
 - [ ] Update ContraRec.
 - [ ] Update ContraRec w/ X-Aug (Ours).
-- [ ] Update DuoRec.
+- [x] Update DuoRec.
 - [ ] Update DuoRec w/ X-Aug (Ours).
 - [ ] Update ICL.
 - [ ] Update EC4SRec (Ours).
