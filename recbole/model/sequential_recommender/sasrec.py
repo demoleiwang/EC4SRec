@@ -164,6 +164,19 @@ class SASRec(SequentialRecommender):
             nce_loss = self.nce_fct(nce_logits, nce_labels)
             return loss + self.config['cl_loss_weight'] * nce_loss
 
+        elif self.config['method'] == 'DuoRec':
+            aug_seq_output = self.forward(item_seq, item_seq_len)
+
+            sem_aug, sem_aug_lengths = interaction['sem_aug'], interaction['sem_aug_lengths']
+            sem_aug_seq_output = self.forward(sem_aug, sem_aug_lengths)
+
+            sem_nce_logits, sem_nce_labels = self.info_nce(aug_seq_output, sem_aug_seq_output,
+                                                           temp=self.config['temp_ratio'],
+                                                           batch_size=item_seq_len.shape[0])
+
+            loss += self.config['lmd'] * self.nce_fct(sem_nce_logits, sem_nce_labels)
+            return loss
+
         elif self.config['method'] ==  'CL4SRec_XAUG':
             if self.start_flag == 0:
                 return loss

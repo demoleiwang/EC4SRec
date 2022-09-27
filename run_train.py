@@ -18,11 +18,11 @@ if __name__ == '__main__':
     parser.add_argument('--model', '-m', type=str, default='SASRec', help='name of models')
     parser.add_argument('--dataset', '-d', type=str, default='ml-100k', help='name of datasets')
     parser.add_argument('--config_files', type=str, default='seq.yaml', help='config files')
-    parser.add_argument('--method', type=str, default='CL4SRec_XAUG', help='None, CL4SRec, ...')
+    parser.add_argument('--method', type=str, default='DuoRec', help='None, CL4SRec, DuoRec, ...')
     parser.add_argument('--cl_loss_weight', type=float, default=0.1, help='weight for contrastive loss')
     parser.add_argument('--temp_ratio', type=float, default=1.0, help='temperature ratio')
 
-    parser.add_argument('--gpu_id', type=int, default=4, help='gpu id')
+    parser.add_argument('--gpu_id', type=int, default=0, help='gpu id')
 
     ### ours
     parser.add_argument('--xai_method', type=str, default='occlusion', help='saliency, occlusion')

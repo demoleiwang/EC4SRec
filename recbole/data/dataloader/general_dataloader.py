@@ -40,6 +40,12 @@ class TrainDataLoader(NegSampleDataLoader):
         self._set_neg_sample_args(config, dataset, config['MODEL_INPUT_TYPE'], config['train_neg_sample_args'])
         super().__init__(config, dataset, sampler, shuffle=shuffle)
 
+        if config['method'] in ['DuoRec']:
+            self.same_target_index = dataset.same_target_index
+            self.static_item_id_list = dataset['item_id_list'].detach().clone()
+            self.static_item_length = dataset['item_length'].detach().clone()
+            self.mapping_index = torch.arange(len(self.static_item_id_list))
+
     def _init_batch_size_and_step(self):
         batch_size = self.config['train_batch_size']
         if self.neg_sample_args['strategy'] == 'by':
@@ -61,6 +67,12 @@ class TrainDataLoader(NegSampleDataLoader):
 
     def _shuffle(self):
         self.dataset.shuffle()
+        if self.config['method'] in ['DuoRec', 'DuoRec_XAUG']:
+            self.same_target_index = self.same_target_index[self.dataset.inter_feat.index]
+            self.mapping_index = self.mapping_index[self.dataset.inter_feat.index]
+        if self.config['method'] in ['DuoRec_XAUG']:
+            self.union_target_index = self.union_target_index[self.dataset.inter_feat.index]
+            self.intersect_target_index = self.intersect_target_index[self.dataset.inter_feat.index]
 
     def update_start(self, start_flag):
         self.start_flag = start_flag
@@ -76,6 +88,13 @@ class TrainDataLoader(NegSampleDataLoader):
                 # self.cl4srec_aug(cur_data)
             else:
                 self.cl4srec_aug_x(cur_data)
+        if self.config['method'] == 'DuoRec':
+            self.duorec_aug(cur_data, slice(self.pr, self.pr + self.step))
+        if self.config['method'] == 'DuoRec_XAUG':
+            if self.start_flag == 0:
+                pass
+            else:
+                self.duoxairec_aug(cur_data, slice(self.pr, self.pr + self.step))
 
         self.pr += self.step
         return cur_data
@@ -297,10 +316,36 @@ class TrainDataLoader(NegSampleDataLoader):
                                      'aug2': torch.stack(aug_seq2), 'aug_len2': torch.stack(aug_len2),
                                      'aug_neg': torch.stack(neg_seq_), 'aug_neg_len': torch.stack(neg_seq_len_)}))
 
+    def duorec_aug(self, cur_data, index):
+        cur_same_target = self.same_target_index[index]
+        null_index = []
+        sample_pos = []
+        for i, targets in enumerate(cur_same_target):
+            # in case there is no same-target sequence
+            # don't know why this happens since the filtering has been applied
+            if len(targets) == 0:
+                sample_pos.append(-1)
+                null_index.append(i)
+            else:
+                sample_pos.append(np.random.choice(targets))
+        sem_pos_seqs = self.static_item_id_list[sample_pos]
+        sem_pos_lengths = self.static_item_length[sample_pos]
+        if null_index:
+            sem_pos_seqs[null_index] = cur_data['item_id_list'][null_index]
+            sem_pos_lengths[null_index] = cur_data['item_length'][null_index]
+
+        cur_data.update(Interaction({'sem_aug': sem_pos_seqs, 'sem_aug_lengths': sem_pos_lengths}))
 
     def update_xai_info(self, examples_attribution):
         self.examples_attribution_xai = examples_attribution
         self.dataset.inter_feat.update(Interaction({'attribution_scores': examples_attribution}))
+
+        if self.config['SSL_AUG'] in ['DuoRec_XAUG', 'EC4SRec']:
+            reverse_index = torch.sort(self.mapping_index)[-1]
+            self.duorec_attribution_xai = examples_attribution[reverse_index]
+            average_v = np.sum(self.duorec_attribution_xai) / torch.sum(self.static_item_length).item()
+            tmp = np.where(self.duorec_attribution_xai > average_v, self.duorec_attribution_xai, 0.)
+            self.duorec_attribution_xai_score = np.sum(tmp, axis=-1)
 
 
 class NegSampleEvalDataLoader(NegSampleDataLoader):

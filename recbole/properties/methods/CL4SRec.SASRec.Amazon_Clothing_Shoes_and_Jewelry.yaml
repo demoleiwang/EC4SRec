@@ -1,4 +1,4 @@
-eta: 0.8
-gamma: 0.2
+eta: 0.2
+gamma: 0.7
 beta: 0.2
 epochs: 60

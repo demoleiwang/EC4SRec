@@ -190,3 +190,57 @@ class SequentialDataset(Dataset):
             raise ValueError(f'The ordering args for sequential recommendation has to be \'TO\'')
 
         return super().build()
+
+    def leave_one_out(self, group_by, leave_one_mode):
+        """Split interaction records by leave one out strategy.
+
+        Args:
+            group_by (str): Field name that interaction records should grouped by before splitting.
+            leave_one_mode (str): The way to leave one out. It can only take three values:
+                'valid_and_test', 'valid_only' and 'test_only'.
+
+        Returns:
+            list: List of :class:`~Dataset`, whose interaction features has been split.
+        """
+        self.logger.debug(f'leave one out, group_by=[{group_by}], leave_one_mode=[{leave_one_mode}]')
+        if group_by is None:
+            raise ValueError('leave one out strategy require a group field')
+
+        grouped_inter_feat_index = self._grouped_index(self.inter_feat[group_by].numpy())
+        if leave_one_mode == 'valid_and_test':
+            next_index = self._split_index_by_leave_one_out(grouped_inter_feat_index, leave_one_num=2)
+        elif leave_one_mode == 'valid_only':
+            next_index = self._split_index_by_leave_one_out(grouped_inter_feat_index, leave_one_num=1)
+            next_index.append([])
+        elif leave_one_mode == 'test_only':
+            next_index = self._split_index_by_leave_one_out(grouped_inter_feat_index, leave_one_num=1)
+            next_index = [next_index[0], [], next_index[1]]
+        else:
+            raise NotImplementedError(f'The leave_one_mode [{leave_one_mode}] has not been implemented.')
+
+        self._drop_unused_col()
+        next_df = [self.inter_feat[index] for index in next_index]
+        next_ds = [self.copy(_) for _ in next_df]
+
+        if self.config['method'] in ['DuoRec', 'DuoRec_XAUG', 'EC4SRec']:
+            next_ds[0].same_target_index = self.semantic_augmentation(next_ds[0])
+
+        return next_ds
+
+    def semantic_augmentation(self, train_data):
+        import os
+        aug_path = self.config['data_path'] + '/semantic_augmentation_origin.npy'
+        if os.path.exists(aug_path):  # and self.config['dataset'] != 'ml-1m':
+            same_target_index = np.load(aug_path, allow_pickle=True)
+        else:
+            same_target_index = []
+            target_item = train_data.inter_feat['item_id'].numpy()
+            for index, item_id in enumerate(target_item):
+                all_index_same_id = np.where(target_item == item_id)[0]  # all index of a specific item id with self item
+                delete_index = np.argwhere(all_index_same_id == index)
+                all_index_same_id_wo_self = np.delete(all_index_same_id, delete_index)
+                same_target_index.append(all_index_same_id_wo_self)
+            same_target_index = np.array(same_target_index)
+            np.save(aug_path, same_target_index)
+        return same_target_index
+

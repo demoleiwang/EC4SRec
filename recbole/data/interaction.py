@@ -294,6 +294,7 @@ class Interaction(object):
         """Shuffle current interaction inplace.
         """
         index = torch.randperm(self.length)
+        self.index = index
         self._reindex(index)
 
     def sort(self, by, ascending=True):

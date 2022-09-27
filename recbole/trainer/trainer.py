@@ -341,7 +341,7 @@ class Trainer(AbstractTrainer):
             #     if self.config['method'] == 'CL4SRec':
             #         self.cl4srec_aug_func(train_data)
 
-            if self.config['method'] in ['CL4SRec_XAUG'] \
+            if self.config['method'] in ['CL4SRec_XAUG', 'DuoRec_XAUG'] \
                     and epoch_idx in self.config['update_xai_epoch']:
                 train_data.update_start(0)
                 self.model.update_start(0)
