@@ -54,7 +54,7 @@ python run_train.py --dataset=Amazon_Beauty --model=SASRec --method=DuoRec --gpu
 |+X-Aug (Occlusion)|          |           |           |        |         |         |
 | ContraRec        |          |           |           |        |         |         |
 |+X-Aug (Occlusion)|          |           |           |        |         |         |
-| DuoRec           |          |           |           |        |         |         |
+| DuoRec           |0.0764    |0.1198     |0.2216     |0.0462  |0.0602   |0.0860   |
 |+X-Aug (Occlusion)|          |           |           |        |         |         |
 | ICL              |          |           |           |        |         |         |
 |EC4SRec (Occlusion)|         |           |           |        |         |         |
