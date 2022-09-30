@@ -3,6 +3,8 @@
 # EC4SRec (Updating)
 Code for the CIKM2022 Paper "Explanation Guided Contrastive Learning for Sequential Recommendation"
 
+![visitors](https://visitor-badge.glitch.me/badge?page_id=demoleiwang/EC4SRec)
+
 ## EC4SRec News
 
 **09/27/2022**: We updated DuoRec on ml-100k.<br/>
